@@ -1,13 +1,15 @@
 package client
 
 import (
+  "bytes"
   "net"
   "time"
   "fmt"
-  //"github.com/RRustom/go-bittorrent/bitfield"
-  //"github.com/RRustom/go-bittorrent/peers"
-  //"github.com/RRustom/go-bittorrent/handshake"
-  //"github.com/RRustom/go-bittorrent/message"
+
+  "github.com/RRustom/go-bittorrent/bitfield"
+  "github.com/RRustom/go-bittorrent/peers"
+  "github.com/RRustom/go-bittorrent/handshake"
+  "github.com/RRustom/go-bittorrent/message"
 )
 
 // a TCP connection with a peer
@@ -44,7 +46,7 @@ func completeHandshake(conn net.Conn, infohash, peerID [20]byte) (*handshake.Han
 }
 
 func recvBitfield(conn net.Conn) (bitfield.Bitfield, error) {
-  conn.setDeadline(time.Now().Add(5 * time.Second))
+  conn.SetDeadline(time.Now().Add(5 * time.Second))
   defer conn.SetDeadline(time.Time{}) // disable the deadline
 
   msg, err := message.Read(conn)
@@ -56,7 +58,7 @@ func recvBitfield(conn net.Conn) (bitfield.Bitfield, error) {
     err := fmt.Errorf("Expected bitfield but got %s", msg)
     return nil, err
   }
-  if msg.ID != message.msgBitfield {
+  if msg.ID != message.MsgBitfield {
     err := fmt.Errorf("Expected bitfield but got ID %d", msg.ID)
     return nil, err
   }
@@ -72,7 +74,7 @@ func New(peer peers.Peer, peerID, infoHash [20]byte) (*Client, error) {
     return nil, err
   }
 
-  _, err := completeHandshake(conn, infoHash, peerID)
+  _, err = completeHandshake(conn, infoHash, peerID)
   if err != nil {
     conn.Close()
     return nil, err
@@ -89,7 +91,7 @@ func New(peer peers.Peer, peerID, infoHash [20]byte) (*Client, error) {
     Bitfield: bf,
     peer:     peer,
     infoHash: infoHash,
-    peerID:   peerID
+    peerID:   peerID,
   }, nil
 }
 
@@ -115,7 +117,7 @@ func (c *Client) SendInterested() error {
 
 // send a NotInterested message to the peer
 func (c *Client) SendUnchoke() error {
-  msg := message.Message{ID: message.MsgUnchoked}
+  msg := message.Message{ID: message.MsgUnchoke}
   _, err := c.Conn.Write(msg.Serialize())
   return err
 }
@@ -123,6 +125,6 @@ func (c *Client) SendUnchoke() error {
 // send a Have message to the peer
 func (c *Client) SendHave(index int) error {
   msg := message.FormatHave(index)
-  _, err : c.Conn.Write(msg.Serialize())
-  return err  
+  _, err := c.Conn.Write(msg.Serialize())
+  return err
 }

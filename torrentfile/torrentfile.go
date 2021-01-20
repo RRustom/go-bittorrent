@@ -6,7 +6,10 @@ import (
   "crypto/rand"
   "crypto/sha1"
   "fmt"
+
   "github.com/jackpal/bencode-go"
+
+  "github.com/RRustom/go-bittorrent/p2p"
 )
 
 const Port uint16 = 6881
@@ -32,9 +35,48 @@ type bencodeTorrent struct {
   Info      bencodeInfo `bencode:"info"`
 }
 
+// DownloadToFile downloads a torrent and writes it to a file
+func (t *TorrentFile) DownloadToFile(path string) error {
+	var peerID [20]byte
+	_, err := rand.Read(peerID[:])
+	if err != nil {
+		return err
+	}
+
+	peers, err := t.requestPeers(peerID, Port)
+	if err != nil {
+		return err
+	}
+
+	torrent := p2p.Torrent{
+		Peers:       peers,
+		PeerID:      peerID,
+		InfoHash:    t.InfoHash,
+		PieceHashes: t.PieceHashes,
+		PieceLength: t.PieceLength,
+		Length:      t.Length,
+		Name:        t.Name,
+	}
+	buf, err := torrent.Download()
+	if err != nil {
+		return err
+	}
+
+	outFile, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+	_, err = outFile.Write(buf)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // parse a torrent file
 func Open(path string) (TorrentFile, error) {
-  file, err = os.Open(path)
+  file, err := os.Open(path)
   if err != nil {
     return TorrentFile{}, err
   }
@@ -56,11 +98,11 @@ func (i *bencodeInfo) hash() ([20]byte, error) {
     return [20]byte{}, err
   }
 
-  h := sha1.Sum(buf.bytes())
+  h := sha1.Sum(buf.Bytes())
   return h, nil
 }
 
-func (i *bencodeInfo) splitPieceHashes ([][20]byte, error) {
+func (i *bencodeInfo) splitPieceHashes() ([][20]byte, error) {
   hashLength := 20 // length of SHA-1 hash
   buf := []byte(i.Pieces)
   if len(buf)%hashLength != 0 {
